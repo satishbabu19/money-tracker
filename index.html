@@ -100,6 +100,11 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
 .chart-wrap{position:relative}.tip{position:absolute;top:0;pointer-events:none;background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-size:12px;min-width:136px;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .tip b{display:block;margin-bottom:4px;font-weight:600}.tip div{display:flex;align-items:center;gap:6px;color:var(--mut);padding:1px 0}.tip i{width:8px;height:8px;border-radius:50%}.tip span{margin-left:auto;padding-left:12px;color:var(--tx);font-family:var(--mono)}
 .rs{transition:opacity .15s;cursor:pointer}.mix{display:flex;align-items:center;gap:28px;flex-wrap:wrap}.mix>#mixleg{flex:1;min-width:200px}
+.cat-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}.cat-row:last-child{margin-bottom:0}
+.cat-name{font-size:13px;flex:1.1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat-bar-wrap{flex:1.6;background:var(--card2);border-radius:100px;height:6px;overflow:hidden}.cat-bar{height:100%;border-radius:100px;transition:width .4s}
+.cat-amt{font-size:12px;font-family:var(--mono);color:var(--mut);min-width:78px;text-align:right}
+.tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:100px;background:var(--accent-bg);color:var(--accent);margin-right:6px}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:12px 18px;font-size:13px;opacity:0;transform:translateY(10px);transition:all .3s;z-index:9999;pointer-events:none;border-left:3px solid var(--green)}
 .toast.show{opacity:1;transform:none}.toast.error{border-left-color:var(--red)}
 @media(max-width:1024px){.stat-grid{grid-template-columns:repeat(3,1fr)}}
@@ -161,6 +166,10 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
      <div class="card"><div class="chart-title">Loans</div><div id="hloan"></div></div>
      <div class="card"><div class="chart-title">Upcoming maturities</div><div class="list" id="upc"></div></div>
     </div>
+    <div class="chart-grid eq">
+     <div class="card"><div class="chart-title">Top expense categories</div><div id="cat-exp"></div></div>
+     <div class="card"><div class="chart-title">Income by category</div><div id="cat-inc"></div></div>
+    </div>
    </section>
    <section id="v-act" class="page hide">
     <div class="page-header"><div><div class="page-title">Transactions</div><div class="page-subtitle">Income and expenses by Cash, UPI and Credit card</div></div><button class="btn add" data-add="tx"><i class="fa fa-plus"></i> Add</button></div>
@@ -186,14 +195,14 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
   <label>Amount (₹)</label><input id="t-amt" type="number" inputmode="decimal">
   <div id="t-mwrap"><label>Paid via</label>
   <div class="seg" id="t-method"><button data-v="Cash" class="on">Cash</button><button data-v="UPI">UPI</button><button data-v="Credit card">Credit card</button></div></div>
-  <div class="two"><div><label>Category</label><input id="t-cat" placeholder="Food, Salary…"></div><div><label>Date</label><input id="t-date" type="date"></div></div>
+  <div class="two"><div><label>Category</label><select id="t-cat"></select></div><div><label>Date</label><input id="t-date" type="date"></div></div>
   <label>Note (optional)</label><input id="t-note">
   <button class="btn" id="t-save">Save transaction</button><button class="btn ghost" data-close>Cancel</button>
 </div></div>
 
 <div class="sheet" id="s-inv"><div class="panel">
   <h3>New investment</h3>
-  <div class="seg" id="i-type"><button data-v="FD" class="on">FD</button><button data-v="RD">RD</button><button data-v="Stocks">Stocks</button><button data-v="MF">MF</button></div>
+  <label>Investment type</label><select id="i-type"></select>
   <label>Name</label><input id="i-name" placeholder="SBI FD, Nifty 50 index fund…">
   <div class="two"><div><label id="i-amtl">Amount invested (₹)</label><input id="i-amt" type="number" inputmode="decimal"></div><div><label>Rate / expected return (% p.a.)</label><input id="i-rate" type="number" step="0.01" inputmode="decimal"></div></div>
   <div class="two"><div><label>Start date</label><input id="i-start" type="date"></div><div><label>Duration (months)</label><input id="i-dur" type="number" inputmode="numeric"></div></div>
@@ -204,7 +213,8 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
 <div class="sheet" id="s-loan"><div class="panel">
   <h3>New loan</h3>
   <button class="link" id="l-preset" type="button" style="display:block;margin:0 auto 4px">Fill my Kotak loan from the statement</button>
-  <label>Loan name</label><input id="l-name" placeholder="Personal loan, Car loan…">
+  <label>Loan type</label><select id="l-type"></select>
+  <label>Loan name</label><input id="l-name" placeholder="e.g. Kotak personal loan">
   <label>Lender (optional)</label><input id="l-lender">
   <div class="two"><div><label>Loan amount (₹)</label><input id="l-amt" type="number" inputmode="decimal"></div><div><label>Interest rate (% p.a.)</label><input id="l-rate" type="number" step="0.01" inputmode="decimal"></div></div>
   <div class="two"><div><label>Tenure (months)</label><input id="l-months" type="number" inputmode="numeric"></div><div><label>First EMI date</label><input id="l-first" type="date"></div></div>
@@ -232,7 +242,13 @@ const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAl
 const inr = n => "₹" + Math.round(n||0).toLocaleString("en-IN");
 const today = () => new Date().toISOString().slice(0,10);
 const fa = n => `<i class="fa fa-${n}"></i>`;
-const ICON = {Cash:fa("money-bill-wave"),UPI:fa("mobile-screen"),"Credit card":fa("credit-card"),income:fa("arrow-down"),FD:fa("building-columns"),RD:fa("calendar-check"),Stocks:fa("chart-line"),MF:fa("layer-group")};
+const CATS = {
+  income: ["Salary","Freelance","Business","Investment Return","Rental","Gift","Other Income"],
+  expense: ["Children","Credit Card Bill","EMI","Dining","Entertainment","Groceries","Gifts","Gas Bill","Health","House Rent","Insurance","Shopping","Fuel","Travel","Utilities","Others"]
+};
+const INV_CAT = {FD:"Fixed Deposit (FD)",RD:"Recurring Deposit (RD)",MF:"Mutual Funds / SIP",Stocks:"Stocks / Equity",PPF:"Public Provident Fund (PPF)",NPS:"National Pension System (NPS)",Gold:"Gold",RealEstate:"Real Estate",Crypto:"Crypto",Other:"Other Investment"};
+const LOAN_CAT = ["Personal Loan","Home Loan","Car Loan","Two-wheeler Loan","Education Loan","Gold Loan","Business Loan","Credit Card / Consumer EMI","Loan against Property","Other Loan"];
+const ICON = {PPF:fa("piggy-bank"),NPS:fa("umbrella"),Gold:fa("coins"),RealEstate:fa("house"),Crypto:fa("bitcoin-sign"),Other:fa("ellipsis"),Cash:fa("money-bill-wave"),UPI:fa("mobile-screen"),"Credit card":fa("credit-card"),income:fa("arrow-down"),FD:fa("building-columns"),RD:fa("calendar-check"),Stocks:fa("chart-line"),MF:fa("layer-group")};
 const COL = {Cash:"#34d97b",UPI:"#7c6af7","Credit card":"#f5c842"};
 let curYM = today().slice(0,7), cBar, cPie, tt, uid, txs = [], invs = [], loans = [], openL = null, preset = false, unsubs = [], mf = "All", tab = "home";
 
@@ -273,14 +289,18 @@ $("#export").onclick = () => {
   const rows = [["Date","Type","Category","Method","Amount","Note"], ...txs.map(t => [t.date,t.type,t.category,t.method||"",t.amount,t.note||""])];
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([rows.map(r => r.map(q).join(",")).join("\n")],{type:"text/csv"})); a.download = "transactions-"+today()+".csv"; a.click(); toast("Exported "+txs.length+" transactions");
 };
+const opts = (el, arr) => el.innerHTML = arr.map(c => Array.isArray(c) ? `<option value="${c[0]}">${c[1]}</option>` : `<option>${c}</option>`).join("");
+const fillCats = () => opts($("#t-cat"), CATS[segVal($("#tx-type"))]);
+opts($("#i-type"), Object.entries(INV_CAT)); opts($("#l-type"), LOAN_CAT);
 const clr = ids => ids.forEach(i => $(i).value = "");
-const newTx = () => { clr(["#t-amt","#t-cat","#t-note"]); $("#t-date").value = today(); open("#s-tx"); };
+const newTx = () => { clr(["#t-amt","#t-note"]); fillCats(); $("#t-date").value = today(); open("#s-tx"); };
 const newInv = () => { clr(["#i-name","#i-amt","#i-rate","#i-dur","#i-mat"]); $("#i-start").value = today(); open("#s-inv"); };
-const newLoan = () => { clr(["#l-name","#l-lender","#l-amt","#l-rate","#l-months","#l-emi"]); $("#l-first").value = today(); preset = false; open("#s-loan"); };
+const newLoan = () => { clr(["#l-name","#l-lender","#l-amt","#l-rate","#l-months","#l-emi"]); $("#l-type").selectedIndex = 0; $("#l-first").value = today(); preset = false; open("#s-loan"); };
 $$("[data-add]").forEach(b => b.onclick = () => ({tx:newTx,inv:newInv,loan:newLoan})[b.dataset.add]());
-seg($("#tx-type"), v => $("#t-mwrap").classList.toggle("hide", v === "income"));
+seg($("#tx-type"), v => { $("#t-mwrap").classList.toggle("hide", v === "income"); fillCats(); });
+fillCats();
 seg($("#t-method")); 
-seg($("#i-type"), v => $("#i-amtl").textContent = v === "RD" ? "Monthly deposit (₹)" : "Amount invested (₹)");
+$("#i-type").onchange = () => $("#i-amtl").textContent = $("#i-type").value === "RD" ? "Monthly deposit (₹)" : "Amount invested (₹)";
 
 // ---------- save ----------
 $("#t-save").onclick = async () => {
@@ -291,7 +311,7 @@ $("#t-save").onclick = async () => {
 };
 function addMonths(d, m){ const x = new Date(d); x.setMonth(x.getMonth()+m); return x.toISOString().slice(0,10); }
 function calc(){
-  const t = segVal($("#i-type")), P = +$("#i-amt").value, r = +$("#i-rate").value, n = +$("#i-dur").value;
+  const t = $("#i-type").value, P = +$("#i-amt").value, r = +$("#i-rate").value, n = +$("#i-dur").value;
   if (!P || !n) return 0;
   if (t === "FD") return P * Math.pow(1 + r/400, 4*n/12);          // quarterly compounding
   if (t === "RD") { let s = 0; for (let i = 1; i <= n; i++) s += P * Math.pow(1 + r/400, 4*(n-i+1)/12); return s; }
@@ -299,7 +319,7 @@ function calc(){
 }
 $("#i-calc").onclick = () => { const v = calc(); if (v) $("#i-mat").value = Math.round(v); };
 $("#i-save").onclick = async () => {
-  const type = segVal($("#i-type")), amount = +$("#i-amt").value, months = +$("#i-dur").value, start = $("#i-start").value || today();
+  const type = $("#i-type").value, amount = +$("#i-amt").value, months = +$("#i-dur").value, start = $("#i-start").value || today();
   if (!amount || !months) return;
   const invested = type === "RD" ? amount * months : amount;
   await addDoc(collection(db,"users",uid,"investments"), {type, name:$("#i-name").value.trim()||type, amount, invested, rate:+$("#i-rate").value||0, months, startDate:start, maturityDate:addMonths(start,months), maturityAmount:+$("#i-mat").value || Math.round(calc())});
@@ -344,14 +364,14 @@ function ringChart(el, items, label, valueTxt, size=190){
   rs.forEach(e => { e.onpointerenter = () => { const x = items[e.dataset.i]; t[0].textContent = x.name; t[1].textContent = inr(x.value); rs.forEach(o => o.style.opacity = o===e ? 1 : .35); }; e.onpointerleave = () => { t[0].textContent = label; t[1].textContent = valueTxt; rs.forEach(o => o.style.opacity = 1); }; });
 }
 const pring = p => { const r = 34, C = 2*Math.PI*r, len = C*Math.min(100,p)/100; return `<svg viewBox="0 0 84 84" width="84" height="84" style="flex:none"><circle cx="42" cy="42" r="${r}" fill="none" stroke="#1e1e28" stroke-width="9"/>${p>0?`<circle cx="42" cy="42" r="${r}" fill="none" stroke="#34d97b" stroke-width="9" stroke-linecap="round" stroke-dasharray="${len} ${C}" transform="rotate(-90 42 42)"/>`:""}<text x="42" y="47" text-anchor="middle" class="rv" style="font-size:15px">${Math.round(p)}%</text></svg>`; };
-const MIX = {FD:"#7c6af7",RD:"#4ecdc4",Stocks:"#f5c842",MF:"#34d97b"};
+const MIX = {FD:"#7c6af7",RD:"#4ecdc4",MF:"#34d97b",Stocks:"#f5c842",PPF:"#5ac8fa",NPS:"#ff9f6b",Gold:"#e0b252",RealEstate:"#b38cff",Crypto:"#f05c6e",Other:"#8e8e9a"};
 function drawCharts(by){
   const ms = [-5,-4,-3,-2,-1,0].map(n => shiftYM(curYM,n)), tot = (m,ty) => txs.filter(t => t.type===ty && t.date.startsWith(m)).reduce((a,t) => a+t.amount,0);
   areaChart($("#c-bar"), ms.map(m => new Date(m+"-01T00:00").toLocaleDateString("en-IN",{month:"short"})), [{name:"Income",color:"#34d97b",data:ms.map(m => tot(m,"income"))},{name:"Expenses",color:"#f05c6e",data:ms.map(m => tot(m,"expense"))}]);
   ringChart($("#c-pie"), Object.keys(by).map(k => ({name:k,color:COL[k],value:by[k]})), "Spent", inr(Object.values(by).reduce((a,v) => a+v,0)));
   const mix = Object.keys(MIX).map(k => ({name:k,color:MIX[k],value:invs.filter(i => i.type===k).reduce((a,i) => a+i.invested,0)})), mt = mix.reduce((a,x) => a+x.value,0);
   ringChart($("#c-mix"), mix, "Invested", inr(mt), 170);
-  $("#mixleg").innerHTML = mix.map(x => `<div class="leg"><span><i class="legend-dot" style="background:${x.color}"></i>${x.name}</span><b>${inr(x.value)}${mt?` · ${Math.round(x.value/mt*100)}%`:""}</b></div>`).join("");
+  $("#mixleg").innerHTML = !mt ? `<div class="empty" style="padding:12px 0;text-align:left">No investments yet</div>` : mix.filter(x => x.value).map(x => `<div class="leg"><span><i class="legend-dot" style="background:${x.color}"></i>${x.name}</span><b>${inr(x.value)}${mt?` · ${Math.round(x.value/mt*100)}%`:""}</b></div>`).join("");
 }
 let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(render, 150); });
 function render(){
@@ -368,6 +388,9 @@ function render(){
   const by = {Cash:0,UPI:0,"Credit card":0}; ex.forEach(t => by[t.method] = (by[t.method]||0)+t.amount);
   $("#mleg").innerHTML = Object.entries(by).map(([k,v]) => `<div class="leg"><span><i class="legend-dot" style="background:${COL[k]}"></i>${k}</span><b>${inr(v)}</b></div>`).join("");
   drawCharts(by);
+  const catBars = (el, list, color) => { const m = {}; list.forEach(t => m[t.category] = (m[t.category]||0)+t.amount); const e = Object.entries(m).sort((a,b) => b[1]-a[1]).slice(0,6), mx = e.length ? e[0][1] : 1;
+    el.innerHTML = e.length ? e.map(([k,v]) => `<div class="cat-row"><div class="cat-name">${esc(k)}</div><div class="cat-bar-wrap"><div class="cat-bar" style="width:${v/mx*100}%;background:${color}"></div></div><div class="cat-amt">${inr(v)}</div></div>`).join("") : `<div class="empty" style="padding:20px 0">Nothing recorded this month</div>`; };
+  catBars($("#cat-exp"), ex, "var(--red)"); catBars($("#cat-inc"), ic, "var(--green)");
   const nowD = today(), up = invs.filter(i => i.maturityDate >= nowD).slice(0,3);
   $("#upc").innerHTML = up.length ? up.map(invRow).join("") : `<div class="empty">No upcoming maturities</div>`;
   const filters = ["All","Income","Cash","UPI","Credit card"];
@@ -383,6 +406,7 @@ const PRE = {
   p:[14680,15166,15318,15471,15625,15782,15940,16099,16260,16423,16587,16753,16920,17090,17261,17433,17608,17784,17962,18141,18323,18506,18691,18878,19067,19257,19450,19645,19841,20040],
   i:[5560,5074,4922,4769,4615,4458,4300,4141,3980,3817,3653,3487,3320,3150,2979,2807,2632,2456,2278,2099,1917,1734,1549,1362,1173,983,790,595,399,200]};
 $("#l-preset").onclick = () => {
+  $("#l-type").value = "Personal Loan";
   Object.entries({"#l-name":"Kotak personal loan","#l-lender":"Kotak Mahindra Bank","#l-amt":522000,"#l-rate":12,"#l-months":30,"#l-first":"2026-10-02","#l-emi":20240}).forEach(([k,v]) => $(k).value = v);
   preset = true;
 };
@@ -395,7 +419,7 @@ $("#l-save").onclick = async () => {
   let sched = [];
   if (preset) sched = PRE.p.map((p,k) => ({d:addMonths(first,k), p, i:PRE.i[k]}));
   else { let bal = principal; for (let k=0;k<months;k++){ const i = Math.round(bal*rate/1200); const p = k===months-1 ? bal : Math.min(emi-i,bal); sched.push({d:addMonths(first,k), p, i}); bal -= p; } }
-  await addDoc(collection(db,"users",uid,"loans"), {name:$("#l-name").value.trim()||"Loan", lender:$("#l-lender").value.trim(), principal, rate, emi, months:sched.length, firstDate:first, sched, paid:[]});
+  await addDoc(collection(db,"users",uid,"loans"), {category:$("#l-type").value, name:$("#l-name").value.trim()||"Loan", lender:$("#l-lender").value.trim(), principal, rate, emi, months:sched.length, firstDate:first, sched, paid:[]});
   close(); toast("Saved");
 };
 const fmtD = d => new Date(d+"T00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
@@ -413,7 +437,7 @@ function renderLoans(){
   const t = today();
   $("#loanl").innerHTML = loans.length ? loans.map(l => {
     const s = loanStats(l), n = l.sched.length, od = s.next && s.next.d < t, open = openL===l.id;
-    return `<div class="card loan"><div style="display:flex;justify-content:space-between;gap:8px"><div class="grow"><b>${esc(l.name)}</b><span class="mut">${esc(l.lender||"")}${l.lender?" · ":""}${l.rate}% · EMI ${inr(l.emi)}</span></div><button class="del" onclick="delLoan('${l.id}')">×</button></div>
+    return `<div class="card loan"><div style="display:flex;justify-content:space-between;gap:8px"><div class="grow"><b>${esc(l.name)}</b><span class="mut"><span class="tag">${esc(l.category||"Loan")}</span>${esc(l.lender||"")}${l.lender?" · ":""}${l.rate}% · EMI ${inr(l.emi)}</span></div><button class="del" onclick="delLoan('${l.id}')">×</button></div>
     <div style="display:flex;align-items:center;gap:16px;margin-top:14px">${pring((n-s.left)/n*100)}<div><div class="mut">Outstanding</div><div class="big" style="font-size:28px">${inr(s.out)}</div><div class="mut">${n-s.left} of ${n} EMIs paid</div></div></div>
     <div class="grid"><div><div class="mut">EMIs paid</div><b>${n-s.left} of ${n}</b></div><div><div class="mut">EMIs remaining</div><b>${s.left}</b></div>
     <div><div class="mut">Next due</div><b class="${od?"neg":""}">${s.next ? fmtD(s.next.d) : "Loan closed"}</b>${od?'<div class="mut neg">Overdue</div>':""}</div><div><div class="mut">Interest remaining</div><b>${inr(s.intLeft)}</b></div></div>
@@ -427,7 +451,7 @@ function renderLoans(){
 }
 function invRow(i, withDel){
   const gain = i.maturityAmount - i.invested;
-  return `<div class="row"><div class="ico inv">${ICON[i.type]}</div><div class="grow"><b>${esc(i.name)}</b><span class="mut">${i.type} · ${i.rate}% · matures ${i.maturityDate}</span></div><div class="amt">${inr(i.maturityAmount)}<div class="mut pos">+${inr(gain)}</div></div>${withDel?`<button class="del" onclick="delInv('${i.id}')">×</button>`:""}</div>`;
+  return `<div class="row"><div class="ico inv">${ICON[i.type]}</div><div class="grow"><b>${esc(i.name)}</b><span class="mut">${INV_CAT[i.type]||i.type} · ${i.rate}% · matures ${i.maturityDate}</span></div><div class="amt">${inr(i.maturityAmount)}<div class="mut pos">+${inr(gain)}</div></div>${withDel?`<button class="del" onclick="delInv('${i.id}')">×</button>`:""}</div>`;
 }
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 </script>
