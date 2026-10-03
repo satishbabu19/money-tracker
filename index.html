@@ -12,7 +12,6 @@
 <title>Money Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 :root{color-scheme:dark;--bg:#0f0f13;--card:#16161d;--surface:#16161d;--card2:#1e1e28;--line:rgba(255,255,255,.07);--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--tx:#f0eff4;--mut:#7c7b8a;--green:#34d97b;--red:#f05c6e;--gold:#f5c842;--blue:#7c6af7;--accent:#7c6af7;--accent-bg:rgba(124,106,247,.12);--mono:'JetBrains Mono',monospace}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -97,6 +96,10 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
 .loan{margin-bottom:14px}.sch{max-height:380px;overflow:auto}.sch .row{background:var(--card)}.row.paid{opacity:.55}
 .chk{width:24px;height:24px;border-radius:50%;border:2px solid #4a4a58;display:grid;place-items:center;font-size:13px;font-weight:700;color:transparent;flex:none}
 .chk.on{background:var(--green);border-color:var(--green);color:#000}
+.ax{fill:#7c7b8a;font:10.5px 'JetBrains Mono',monospace}.rl{fill:#7c7b8a;font:11px 'Sora',sans-serif}.rv{fill:#f0eff4;font:600 15px 'JetBrains Mono',monospace}
+.chart-wrap{position:relative}.tip{position:absolute;top:0;pointer-events:none;background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-size:12px;min-width:136px;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.tip b{display:block;margin-bottom:4px;font-weight:600}.tip div{display:flex;align-items:center;gap:6px;color:var(--mut);padding:1px 0}.tip i{width:8px;height:8px;border-radius:50%}.tip span{margin-left:auto;padding-left:12px;color:var(--tx);font-family:var(--mono)}
+.rs{transition:opacity .15s;cursor:pointer}.mix{display:flex;align-items:center;gap:28px;flex-wrap:wrap}.mix>#mixleg{flex:1;min-width:200px}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:12px 18px;font-size:13px;opacity:0;transform:translateY(10px);transition:all .3s;z-index:9999;pointer-events:none;border-left:3px solid var(--green)}
 .toast.show{opacity:1;transform:none}.toast.error{border-left-color:var(--red)}
 @media(max-width:1024px){.stat-grid{grid-template-columns:repeat(3,1fr)}}
@@ -151,8 +154,8 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
      <div class="stat-card" style="--c:#4ecdc4"><div class="stat-label">Savings rate</div><div class="stat-value sav" id="sav">0%</div><div class="stat-change">of income saved</div></div>
     </div>
     <div class="chart-grid">
-     <div class="card"><div class="chart-title">Income &amp; expenses — last 6 months</div><div class="chart-wrap"><canvas id="c-bar"></canvas></div></div>
-     <div class="card"><div class="chart-title">Spent by method</div><div class="chart-wrap" style="height:190px"><canvas id="c-pie"></canvas></div><div id="mleg" style="margin-top:14px"></div></div>
+     <div class="card"><div class="chart-title">Income &amp; expenses — last 6 months</div><div class="chart-wrap" id="c-bar"></div></div>
+     <div class="card"><div class="chart-title">Spent by method</div><div id="c-pie"></div><div id="mleg" style="margin-top:14px"></div></div>
     </div>
     <div class="chart-grid eq">
      <div class="card"><div class="chart-title">Loans</div><div id="hloan"></div></div>
@@ -165,6 +168,7 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
    </section>
    <section id="v-inv" class="page hide">
     <div class="page-header"><div><div class="page-title">Investments</div><div class="page-subtitle">FD, RD, stocks and mutual funds</div></div><button class="btn add" data-add="inv"><i class="fa fa-plus"></i> Add</button></div>
+    <div class="card" style="margin-bottom:16px"><div class="chart-title">Portfolio mix (amount invested)</div><div class="mix"><div id="c-mix"></div><div id="mixleg"></div></div></div>
     <div class="list" id="invl"></div>
    </section>
    <section id="v-loan" class="page hide">
@@ -256,7 +260,7 @@ const segVal = el => el.querySelector(".on").dataset.v;
 const open = id => $(id).classList.add("show"), close = () => $$(".sheet").forEach(s => s.classList.remove("show"));
 $$("[data-close]").forEach(b => b.onclick = close);
 $$(".sheet").forEach(s => s.onclick = e => { if (e.target === s) close(); });
-$$(".nav-item").forEach(b => b.onclick = () => { tab = b.dataset.t; $$(".nav-item").forEach(x => x.classList.toggle("active", x === b)); ["home","act","inv","loan"].forEach(t => $("#v-"+t).classList.toggle("hide", t !== tab)); sideClose(); });
+$$(".nav-item").forEach(b => b.onclick = () => { tab = b.dataset.t; $$(".nav-item").forEach(x => x.classList.toggle("active", x === b)); ["home","act","inv","loan"].forEach(t => $("#v-"+t).classList.toggle("hide", t !== tab)); sideClose(); render(); });
 const sideClose = () => { $("#sidebar").classList.remove("open"); $("#overlay").classList.remove("open"); };
 $("#burger").onclick = () => { $("#sidebar").classList.toggle("open"); $("#overlay").classList.toggle("open"); };
 $("#overlay").onclick = sideClose;
@@ -305,15 +309,51 @@ const del = async (col,id) => { if (confirm("Delete this entry?")) { await delet
 window.delTx = id => del("transactions",id); window.delInv = id => del("investments",id);
 
 // ---------- render ----------
-function drawCharts(by){
-  if (!window.Chart) return;
-  const ms = [-5,-4,-3,-2,-1,0].map(n => shiftYM(curYM,n)), tot = (m,ty) => txs.filter(t => t.type===ty && t.date.startsWith(m)).reduce((a,t) => a+t.amount,0);
-  const bd = {labels:ms.map(m => new Date(m+"-01T00:00").toLocaleDateString("en-IN",{month:"short"})), datasets:[{label:"Income",data:ms.map(m => tot(m,"income")),backgroundColor:"#34d97b",borderRadius:4},{label:"Expenses",data:ms.map(m => tot(m,"expense")),backgroundColor:"#f05c6e",borderRadius:4}]};
-  const tk = {color:"#7c7b8a"};
-  if (cBar) { cBar.data = bd; cBar.update(); } else cBar = new Chart($("#c-bar"),{type:"bar",data:bd,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#7c7b8a",boxWidth:10}}},scales:{x:{grid:{display:false},ticks:tk},y:{grid:{color:"rgba(255,255,255,.06)"},ticks:tk}}}});
-  const v = Object.values(by), none = !v.some(Boolean), pd = {labels:Object.keys(by), datasets:[{data:none?[1]:v, backgroundColor:none?["#1e1e28"]:Object.keys(by).map(k => COL[k]), borderWidth:0}]};
-  if (cPie) { cPie.data = pd; cPie.update(); } else cPie = new Chart($("#c-pie"),{type:"doughnut",data:pd,options:{responsive:true,maintainAspectRatio:false,cutout:"68%",plugins:{legend:{display:false}}}});
+const short = n => n >= 1e7 ? +(n/1e7).toFixed(1)+"Cr" : n >= 1e5 ? +(n/1e5).toFixed(1)+"L" : n >= 1e3 ? +(n/1e3).toFixed(1)+"K" : n;
+const niceStep = x => { const p = Math.pow(10, Math.floor(Math.log10(x))), f = x/p; return (f<=1?1:f<=2?2:f<=5?5:10)*p; };
+const smooth = pts => pts.reduce((d,[x1,y1],i) => i ? d+` C${(pts[i-1][0]+x1)/2},${pts[i-1][1]} ${(pts[i-1][0]+x1)/2},${y1} ${x1},${y1}` : `M${x1},${y1}`, "");
+// Smooth gradient area chart with hover tooltip
+function areaChart(el, labels, series){
+  const W = el.clientWidth || 640, H = 250, m = {l:44,r:14,t:12,b:26}, iw = W-m.l-m.r, ih = H-m.t-m.b, n = labels.length;
+  const mx = Math.max(100, ...series.flatMap(x => x.data)), step = niceStep(mx/4), top = Math.ceil(mx/step)*step;
+  const X = i => m.l + (n>1 ? i/(n-1)*iw : iw/2), Y = v => m.t + ih - v/top*ih;
+  let g = "";
+  for (let v=0; v<=top+1e-9; v+=step) g += `<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="rgba(255,255,255,.07)" stroke-dasharray="3 5"/><text x="${m.l-8}" y="${Y(v)+4}" text-anchor="end" class="ax">${short(v)}</text>`;
+  g += labels.map((l,i) => `<text x="${X(i)}" y="${H-6}" text-anchor="middle" class="ax">${l}</text>`).join("");
+  const defs = series.map((x,k) => `<linearGradient id="${el.id}g${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${x.color}" stop-opacity=".35"/><stop offset="1" stop-color="${x.color}" stop-opacity="0"/></linearGradient>`).join("");
+  const paths = series.map((x,k) => { const d = smooth(x.data.map((v,i) => [X(i),Y(v)])); return `<path d="${d} L${X(n-1)},${Y(0)} L${X(0)},${Y(0)}Z" fill="url(#${el.id}g${k})"/><path d="${d}" fill="none" stroke="${x.color}" stroke-width="2" stroke-linecap="round"/>`; }).join("");
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;touch-action:pan-y"><defs>${defs}</defs>${g}${paths}<line class="cl" y1="${m.t}" y2="${m.t+ih}" stroke="rgba(255,255,255,.3)" stroke-dasharray="3 3" style="display:none"/><g class="cd"></g></svg><div class="tip" style="display:none"></div>`;
+  const svg = el.firstChild, tip = el.querySelector(".tip"), cl = svg.querySelector(".cl"), cd = svg.querySelector(".cd");
+  const move = e => {
+    const r = svg.getBoundingClientRect(); let i = Math.round(((e.clientX-r.left)*(W/r.width)-m.l)/iw*(n-1)); i = Math.max(0,Math.min(n-1,i));
+    const x = X(i); cl.setAttribute("x1",x); cl.setAttribute("x2",x); cl.style.display = "";
+    cd.innerHTML = series.map(z => `<circle cx="${x}" cy="${Y(z.data[i])}" r="4.5" fill="${z.color}" stroke="#16161d" stroke-width="2"/>`).join("");
+    tip.style.display = ""; tip.innerHTML = `<b>${labels[i]}</b>`+series.map(z => `<div><i style="background:${z.color}"></i>${z.name}<span>${inr(z.data[i])}</span></div>`).join("");
+    tip.style.left = Math.min(Math.max(x*(r.width/W)-68,0), r.width-140)+"px";
+  };
+  const out = () => { cl.style.display = "none"; cd.innerHTML = ""; tip.style.display = "none"; };
+  svg.addEventListener("pointermove", move); svg.addEventListener("pointerdown", move); svg.addEventListener("pointerleave", out);
 }
+// Rounded ring chart; hover a segment to see its value in the centre
+function ringChart(el, items, label, valueTxt, size=190){
+  const r = size/2-14, C = 2*Math.PI*r, tot = items.reduce((a,x) => a+x.value,0), live = items.filter(x => x.value>0).length, gap = live>1 ? 20 : 0, c = size/2;
+  let off = 0, segs = `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="#1e1e28" stroke-width="16"/>`;
+  items.forEach((x,i) => { if (!x.value) return; const share = x.value/tot*C, len = Math.max(.5, share-gap); segs += `<circle class="rs" data-i="${i}" cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${x.color}" stroke-width="16" stroke-linecap="round" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 ${c} ${c})"/>`; off += share; });
+  el.innerHTML = `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="display:block;margin:0 auto">${segs}<text x="50%" y="46%" text-anchor="middle" class="rl">${label}</text><text x="50%" y="58%" text-anchor="middle" class="rv">${valueTxt}</text></svg>`;
+  const t = el.querySelectorAll("text"), rs = el.querySelectorAll(".rs");
+  rs.forEach(e => { e.onpointerenter = () => { const x = items[e.dataset.i]; t[0].textContent = x.name; t[1].textContent = inr(x.value); rs.forEach(o => o.style.opacity = o===e ? 1 : .35); }; e.onpointerleave = () => { t[0].textContent = label; t[1].textContent = valueTxt; rs.forEach(o => o.style.opacity = 1); }; });
+}
+const pring = p => { const r = 34, C = 2*Math.PI*r, len = C*Math.min(100,p)/100; return `<svg viewBox="0 0 84 84" width="84" height="84" style="flex:none"><circle cx="42" cy="42" r="${r}" fill="none" stroke="#1e1e28" stroke-width="9"/>${p>0?`<circle cx="42" cy="42" r="${r}" fill="none" stroke="#34d97b" stroke-width="9" stroke-linecap="round" stroke-dasharray="${len} ${C}" transform="rotate(-90 42 42)"/>`:""}<text x="42" y="47" text-anchor="middle" class="rv" style="font-size:15px">${Math.round(p)}%</text></svg>`; };
+const MIX = {FD:"#7c6af7",RD:"#4ecdc4",Stocks:"#f5c842",MF:"#34d97b"};
+function drawCharts(by){
+  const ms = [-5,-4,-3,-2,-1,0].map(n => shiftYM(curYM,n)), tot = (m,ty) => txs.filter(t => t.type===ty && t.date.startsWith(m)).reduce((a,t) => a+t.amount,0);
+  areaChart($("#c-bar"), ms.map(m => new Date(m+"-01T00:00").toLocaleDateString("en-IN",{month:"short"})), [{name:"Income",color:"#34d97b",data:ms.map(m => tot(m,"income"))},{name:"Expenses",color:"#f05c6e",data:ms.map(m => tot(m,"expense"))}]);
+  ringChart($("#c-pie"), Object.keys(by).map(k => ({name:k,color:COL[k],value:by[k]})), "Spent", inr(Object.values(by).reduce((a,v) => a+v,0)));
+  const mix = Object.keys(MIX).map(k => ({name:k,color:MIX[k],value:invs.filter(i => i.type===k).reduce((a,i) => a+i.invested,0)})), mt = mix.reduce((a,x) => a+x.value,0);
+  ringChart($("#c-mix"), mix, "Invested", inr(mt), 170);
+  $("#mixleg").innerHTML = mix.map(x => `<div class="leg"><span><i class="legend-dot" style="background:${x.color}"></i>${x.name}</span><b>${inr(x.value)}${mt?` · ${Math.round(x.value/mt*100)}%`:""}</b></div>`).join("");
+}
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(render, 150); });
 function render(){
   renderLoans();
   const mt = txs.filter(t => t.date.startsWith(curYM)), ex = mt.filter(t => t.type==="expense"), ic = mt.filter(t => t.type==="income");
@@ -374,8 +414,7 @@ function renderLoans(){
   $("#loanl").innerHTML = loans.length ? loans.map(l => {
     const s = loanStats(l), n = l.sched.length, od = s.next && s.next.d < t, open = openL===l.id;
     return `<div class="card loan"><div style="display:flex;justify-content:space-between;gap:8px"><div class="grow"><b>${esc(l.name)}</b><span class="mut">${esc(l.lender||"")}${l.lender?" · ":""}${l.rate}% · EMI ${inr(l.emi)}</span></div><button class="del" onclick="delLoan('${l.id}')">×</button></div>
-    <div class="mut" style="margin-top:12px">Outstanding</div><div class="big" style="font-size:32px">${inr(s.out)}</div>
-    <div class="bar"><i style="width:${(n-s.left)/n*100}%;background:var(--green)"></i></div>
+    <div style="display:flex;align-items:center;gap:16px;margin-top:14px">${pring((n-s.left)/n*100)}<div><div class="mut">Outstanding</div><div class="big" style="font-size:28px">${inr(s.out)}</div><div class="mut">${n-s.left} of ${n} EMIs paid</div></div></div>
     <div class="grid"><div><div class="mut">EMIs paid</div><b>${n-s.left} of ${n}</b></div><div><div class="mut">EMIs remaining</div><b>${s.left}</b></div>
     <div><div class="mut">Next due</div><b class="${od?"neg":""}">${s.next ? fmtD(s.next.d) : "Loan closed"}</b>${od?'<div class="mut neg">Overdue</div>':""}</div><div><div class="mut">Interest remaining</div><b>${inr(s.intLeft)}</b></div></div>
     ${s.next ? `<button class="btn" style="margin-top:14px" onclick="togPaid('${l.id}',${s.nextK})">Mark ${fmtD(s.next.d)} EMI as paid</button>` : ""}
