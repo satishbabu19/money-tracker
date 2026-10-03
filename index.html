@@ -72,6 +72,9 @@ input[type=date]{-webkit-appearance:none;appearance:none;min-height:46px}
  .row{padding:14px 20px}
  .seg button{font-size:15px}
 }
+.loan{margin-bottom:12px}.sch{max-height:380px;overflow:auto}.row.paid{opacity:.55}
+.chk{width:24px;height:24px;border-radius:50%;border:2px solid #636366;display:grid;place-items:center;font-size:13px;font-weight:700;color:transparent;flex:none}
+.chk.on{background:var(--green);border-color:var(--green);color:#000}
 @media(prefers-reduced-motion:reduce){.panel{animation:none}}
 </style>
 </head>
@@ -100,15 +103,18 @@ input[type=date]{-webkit-appearance:none;appearance:none;min-height:46px}
 <h2>Investments</h2>
     <div class="grid" style="margin-top:0"><div class="card"><div class="mut">Invested</div><b id="tinv">₹0</b></div><div class="card"><div class="mut">Expected value</div><b class="g" id="tmat">₹0</b></div></div>
     <h2>Upcoming maturities</h2><div class="list" id="upc"></div>
+<h2>Loans</h2><div class="grid" style="margin-top:0" id="hloan"></div>
 </div></div>
   </section>
   <section id="v-act" class="hide"><h1>Activity</h1>
     <div class="seg" id="mfilter"></div><div class="list" id="txl"></div></section>
+  <section id="v-loan" class="hide"><h1>Loans</h1>
+    <button class="btn" id="addloan" style="width:auto;margin:0 0 16px;padding:10px 20px">+ Add loan</button><div id="loanl"></div></section>
   <section id="v-inv" class="hide"><h1>Investments</h1><div class="list" id="invl"></div>
     <button class="link" id="out" style="margin-top:24px;padding:12px 8px">Sign out</button></section>
  </div>
  <button class="fab" id="fab" aria-label="Add">+</button>
- <nav class="tabs"><div class="brand">Money Tracker</div><button data-t="home" class="on"><span>◔</span>Home</button><button data-t="act"><span>☰</span>Activity</button><button data-t="inv"><span>↗</span>Invest</button></nav>
+ <nav class="tabs"><div class="brand">Money Tracker</div><button data-t="home" class="on"><span>◔</span>Home</button><button data-t="act"><span>☰</span>Activity</button><button data-t="inv"><span>↗</span>Invest</button><button data-t="loan"><span>⌂</span>Loans</button></nav>
 </div>
 
 <div class="sheet" id="s-tx"><div class="panel">
@@ -132,10 +138,21 @@ input[type=date]{-webkit-appearance:none;appearance:none;min-height:46px}
   <button class="btn" id="i-save">Save investment</button><button class="btn ghost" data-close>Cancel</button>
 </div></div>
 
+<div class="sheet" id="s-loan"><div class="panel">
+  <h3>New loan</h3>
+  <button class="link" id="l-preset" type="button" style="display:block;margin:0 auto 4px">Fill my Kotak loan from the statement</button>
+  <label>Loan name</label><input id="l-name" placeholder="Personal loan, Car loan…">
+  <label>Lender (optional)</label><input id="l-lender">
+  <div class="two"><div><label>Loan amount (₹)</label><input id="l-amt" type="number" inputmode="decimal"></div><div><label>Interest rate (% p.a.)</label><input id="l-rate" type="number" step="0.01" inputmode="decimal"></div></div>
+  <div class="two"><div><label>Tenure (months)</label><input id="l-months" type="number" inputmode="numeric"></div><div><label>First EMI date</label><input id="l-first" type="date"></div></div>
+  <label>Monthly EMI (₹) <button class="link" id="l-calc" type="button">Auto-calculate</button></label><input id="l-emi" type="number" inputmode="decimal">
+  <button class="btn" id="l-save">Save loan</button><button class="btn ghost" data-close>Cancel</button>
+</div></div>
+
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import {getFirestore,collection,addDoc,deleteDoc,doc,onSnapshot,query,orderBy} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import {getFirestore,collection,addDoc,deleteDoc,doc,onSnapshot,query,orderBy,updateDoc} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 // Firebase web config
 const firebaseConfig = {
@@ -153,7 +170,7 @@ const inr = n => "₹" + Math.round(n||0).toLocaleString("en-IN");
 const today = () => new Date().toISOString().slice(0,10);
 const ICON = {Cash:"💵",UPI:"📱","Credit card":"💳",income:"⬇",FD:"🏦",RD:"🗓",Stocks:"📈",MF:"🧺"};
 const COL = {Cash:"#30d158",UPI:"#0a84ff","Credit card":"#ff9f0a"};
-let uid, txs = [], invs = [], unsubs = [], mf = "All", tab = "home";
+let uid, txs = [], invs = [], loans = [], openL = null, preset = false, unsubs = [], mf = "All", tab = "home";
 
 // ---------- auth ----------
 const aerr = m => $("#aerr").textContent = m;
@@ -168,6 +185,7 @@ onAuthStateChanged(auth, u => {
   if (!u) return;
   uid = u.uid;
   unsubs.push(onSnapshot(query(collection(db,"users",uid,"transactions"),orderBy("date","desc")), s => {txs = s.docs.map(d => ({id:d.id,...d.data()})); render();}));
+  unsubs.push(onSnapshot(collection(db,"users",uid,"loans"), s => {loans = s.docs.map(d => ({id:d.id,...d.data()})); render();}));
   unsubs.push(onSnapshot(query(collection(db,"users",uid,"investments"),orderBy("maturityDate")), s => {invs = s.docs.map(d => ({id:d.id,...d.data()})); render();}));
 });
 
@@ -177,9 +195,12 @@ const segVal = el => el.querySelector(".on").dataset.v;
 const open = id => $(id).classList.add("show"), close = () => $$(".sheet").forEach(s => s.classList.remove("show"));
 $$("[data-close]").forEach(b => b.onclick = close);
 $$(".sheet").forEach(s => s.onclick = e => { if (e.target === s) close(); });
-$$(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; $$(".tabs button").forEach(x => x.classList.toggle("on", x === b)); ["home","act","inv"].forEach(t => $("#v-"+t).classList.toggle("hide", t !== tab)); });
+$$(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; $$(".tabs button").forEach(x => x.classList.toggle("on", x === b)); ["home","act","inv","loan"].forEach(t => $("#v-"+t).classList.toggle("hide", t !== tab)); });
+const newLoan = () => { ["#l-name","#l-lender","#l-amt","#l-rate","#l-months","#l-emi"].forEach(i => $(i).value = ""); $("#l-first").value = today(); preset = false; open("#s-loan"); };
+$("#addloan").onclick = newLoan;
 $("#fab").onclick = () => {
-  if (tab === "inv") { ["#i-name","#i-amt","#i-rate","#i-dur","#i-mat"].forEach(i => $(i).value = ""); $("#i-start").value = today(); open("#s-inv"); }
+  if (tab === "loan") newLoan();
+  else if (tab === "inv") { ["#i-name","#i-amt","#i-rate","#i-dur","#i-mat"].forEach(i => $(i).value = ""); $("#i-start").value = today(); open("#s-inv"); }
   else { ["#t-amt","#t-cat","#t-note"].forEach(i => $(i).value = ""); $("#t-date").value = today(); open("#s-tx"); }
 };
 seg($("#tx-type"), v => $("#t-mwrap").classList.toggle("hide", v === "income"));
@@ -214,6 +235,7 @@ window.delTx = id => del("transactions",id); window.delInv = id => del("investme
 
 // ---------- render ----------
 function render(){
+  renderLoans();
   const ym = today().slice(0,7), mt = txs.filter(t => t.date.startsWith(ym));
   const inc = mt.filter(t => t.type==="income").reduce((a,t) => a+t.amount,0);
   const ex = mt.filter(t => t.type==="expense"), exp = ex.reduce((a,t) => a+t.amount,0);
@@ -232,6 +254,55 @@ function render(){
   const shown = txs.filter(t => mf==="All" || (mf==="Income" ? t.type==="income" : t.method===mf));
   $("#txl").innerHTML = shown.length ? shown.map(t => `<div class="row"><div class="ico">${t.type==="income"?ICON.income:ICON[t.method]}</div><div class="grow"><b>${esc(t.category)}</b><span class="mut">${t.date}${t.method?" · "+t.method:""}${t.note?" · "+esc(t.note):""}</span></div><div class="amt ${t.type==="income"?"pos":""}">${t.type==="income"?"+":"−"}${inr(t.amount)}</div><button class="del" onclick="delTx('${t.id}')">×</button></div>`).join("") : `<div class="empty">Nothing here yet. Tap + to add a transaction.</div>`;
   $("#invl").innerHTML = invs.length ? invs.map(i => invRow(i,true)).join("") : `<div class="empty">No investments yet. Tap + to add an FD, RD, stock or fund.</div>`;
+}
+// ---------- loans ----------
+// Exact installments from the Kotak repayment schedule (principal / interest per month)
+const PRE = {
+  p:[14680,15166,15318,15471,15625,15782,15940,16099,16260,16423,16587,16753,16920,17090,17261,17433,17608,17784,17962,18141,18323,18506,18691,18878,19067,19257,19450,19645,19841,20040],
+  i:[5560,5074,4922,4769,4615,4458,4300,4141,3980,3817,3653,3487,3320,3150,2979,2807,2632,2456,2278,2099,1917,1734,1549,1362,1173,983,790,595,399,200]};
+$("#l-preset").onclick = () => {
+  Object.entries({"#l-name":"Kotak personal loan","#l-lender":"Kotak Mahindra Bank","#l-amt":522000,"#l-rate":12,"#l-months":30,"#l-first":"2026-10-02","#l-emi":20240}).forEach(([k,v]) => $(k).value = v);
+  preset = true;
+};
+["#l-amt","#l-rate","#l-months","#l-first","#l-emi"].forEach(i => $(i).addEventListener("input", () => preset = false));
+const emiCalc = (P,rate,n) => { const r = rate/1200; return r ? P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1) : P/n; };
+$("#l-calc").onclick = () => { const P=+$("#l-amt").value, n=+$("#l-months").value; if (P && n) $("#l-emi").value = Math.round(emiCalc(P,+$("#l-rate").value||0,n)); };
+$("#l-save").onclick = async () => {
+  const principal=+$("#l-amt").value, rate=+$("#l-rate").value||0, months=+$("#l-months").value, emi=+$("#l-emi").value, first=$("#l-first").value;
+  if (!principal || !months || !emi || !first) return;
+  let sched = [];
+  if (preset) sched = PRE.p.map((p,k) => ({d:addMonths(first,k), p, i:PRE.i[k]}));
+  else { let bal = principal; for (let k=0;k<months;k++){ const i = Math.round(bal*rate/1200); const p = k===months-1 ? bal : Math.min(emi-i,bal); sched.push({d:addMonths(first,k), p, i}); bal -= p; } }
+  await addDoc(collection(db,"users",uid,"loans"), {name:$("#l-name").value.trim()||"Loan", lender:$("#l-lender").value.trim(), principal, rate, emi, months:sched.length, firstDate:first, sched, paid:[]});
+  close();
+};
+const fmtD = d => new Date(d+"T00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
+function loanStats(l){
+  const paid = new Set(l.paid||[]);
+  const out = l.principal - l.sched.reduce((a,x,k) => a + (paid.has(k)?x.p:0), 0);
+  const intLeft = l.sched.reduce((a,x,k) => a + (paid.has(k)?0:x.i), 0);
+  const nextK = l.sched.findIndex((x,k) => !paid.has(k));
+  return {paid, out, intLeft, left:l.sched.length-paid.size, nextK, next:l.sched[nextK]};
+}
+window.togPaid = async (id,k) => { const l = loans.find(x => x.id===id), s = new Set(l.paid||[]); s.has(k) ? s.delete(k) : s.add(k); await updateDoc(doc(db,"users",uid,"loans",id), {paid:[...s].sort((a,b) => a-b)}); };
+window.togLoan = id => { openL = openL===id ? null : id; renderLoans(); };
+window.delLoan = id => del("loans",id);
+function renderLoans(){
+  const t = today();
+  $("#loanl").innerHTML = loans.length ? loans.map(l => {
+    const s = loanStats(l), n = l.sched.length, od = s.next && s.next.d < t, open = openL===l.id;
+    return `<div class="card loan"><div style="display:flex;justify-content:space-between;gap:8px"><div class="grow"><b>${esc(l.name)}</b><span class="mut">${esc(l.lender||"")}${l.lender?" · ":""}${l.rate}% · EMI ${inr(l.emi)}</span></div><button class="del" onclick="delLoan('${l.id}')">×</button></div>
+    <div class="mut" style="margin-top:12px">Outstanding</div><div class="big" style="font-size:32px">${inr(s.out)}</div>
+    <div class="bar"><i style="width:${(n-s.left)/n*100}%;background:var(--green)"></i></div>
+    <div class="grid"><div><div class="mut">EMIs paid</div><b>${n-s.left} of ${n}</b></div><div><div class="mut">EMIs remaining</div><b>${s.left}</b></div>
+    <div><div class="mut">Next due</div><b class="${od?"neg":""}">${s.next ? fmtD(s.next.d) : "Loan closed"}</b>${od?'<div class="mut neg">Overdue</div>':""}</div><div><div class="mut">Interest remaining</div><b>${inr(s.intLeft)}</b></div></div>
+    ${s.next ? `<button class="btn" style="margin-top:14px" onclick="togPaid('${l.id}',${s.nextK})">Mark ${fmtD(s.next.d)} EMI as paid</button>` : ""}
+    <button class="link" style="margin-top:8px" onclick="togLoan('${l.id}')">${open?"Hide":"Show"} all EMIs</button>
+    ${open ? `<div class="list sch" style="background:var(--card2);margin-top:6px">${l.sched.map((x,k) => `<div class="row ${s.paid.has(k)?"paid":""}" style="cursor:pointer" onclick="togPaid('${l.id}',${k})"><span class="chk ${s.paid.has(k)?"on":""}">✓</span><div class="grow"><b>${fmtD(x.d)}</b><span class="mut">Principal ${inr(x.p)} · Interest ${inr(x.i)}</span></div><div class="amt">${inr(x.p+x.i)}</div></div>`).join("")}</div>` : ""}</div>`;
+  }).join("") : `<div class="list"><div class="empty">No loans yet. Tap Add loan to track your EMIs.</div></div>`;
+  const ls = loans.map(l => ({l, s:loanStats(l)})), tot = ls.reduce((a,x) => a+x.s.out, 0);
+  const nx = ls.filter(x => x.s.next).sort((a,b) => a.s.next.d < b.s.next.d ? -1 : 1)[0];
+  $("#hloan").innerHTML = loans.length ? `<div class="card"><div class="mut">Outstanding</div><b class="r">${inr(tot)}</b></div><div class="card"><div class="mut">Next EMI</div><b>${nx ? inr(nx.s.next.p+nx.s.next.i) : "None"}</b>${nx?`<div class="mut">${fmtD(nx.s.next.d)}</div>`:""}</div>` : `<div class="card mut" style="grid-column:1/-1">No loans added</div>`;
 }
 function invRow(i, withDel){
   const gain = i.maturityAmount - i.invested;
