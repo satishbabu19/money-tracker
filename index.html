@@ -116,6 +116,36 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
  .toast{left:14px;right:14px;bottom:16px}.period-label{min-width:96px}
 }
 @media(min-width:769px){.sheet{align-items:center}.panel{border-radius:12px}}
+.bottom-nav,.fab{display:none}
+@supports(height:100dvh){.sidebar{height:100dvh}.panel{max-height:92dvh}}
+/* ---- laptop / large screens ---- */
+@media(min-width:1500px){.page{max-width:1320px;margin:0 auto}.stat-value{font-size:22px}}
+/* ---- tablet ---- */
+@media(min-width:769px) and (max-width:1100px){
+ .app{grid-template-columns:200px 1fr}.logo{padding:0 18px 28px}.nav-item{padding:11px 18px}.sidebar-footer{padding:16px 14px;flex-direction:column}
+ .page{padding:28px 22px}.stat-grid{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:900px){.chart-grid{grid-template-columns:1fr}}
+/* ---- phone ---- */
+@media(max-width:768px){
+ .main{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+ .page{padding:16px 14px}.page-title{font-size:20px}.page-subtitle{display:none}
+ .page-header .btn.add{display:none}
+ .period-selector{width:100%;justify-content:space-between}.period-label{flex:1}
+ .stat-card{padding:14px 16px}.stat-value{font-size:18px}
+ .stat-card:nth-child(4){grid-column:1/-1;order:-1}.stat-card:nth-child(4) .stat-value{font-size:28px}
+ .card{padding:16px}.row{padding:12px}
+ .sidebar .nav{display:none}.sidebar .logo{padding-bottom:16px}.sidebar-footer{margin-top:auto}
+ #mfilter{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-14px;padding-right:14px}#mfilter::-webkit-scrollbar{display:none}#mfilter button{white-space:nowrap}
+ .panel::before{content:"";display:block;width:38px;height:4px;border-radius:2px;background:var(--border2);margin:-6px auto 14px}
+ input,select{font-size:16px}
+ .bottom-nav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:250;background:rgba(22,22,29,.92);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid var(--border);padding:6px 6px calc(env(safe-area-inset-bottom) + 6px)}
+ .bottom-nav .nav-item{flex:1;flex-direction:column;gap:3px;padding:6px 0;border:0;font-size:10.5px;justify-content:center;align-items:center;background:none}
+ .bottom-nav .nav-item i{font-size:18px;width:auto}.bottom-nav .nav-item.active{color:var(--accent);background:none}
+ .fab{display:grid;place-items:center;position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom) + 78px);width:52px;height:52px;border-radius:16px;border:0;background:var(--accent);color:#fff;font-size:20px;box-shadow:0 8px 24px rgba(124,106,247,.45);z-index:260;cursor:pointer}
+ .toast{bottom:calc(env(safe-area-inset-bottom) + 84px)}
+}
+@media(pointer:coarse){.row .del{opacity:1}.del{min-width:40px;min-height:40px}}
 @media(max-width:380px){.stat-value{font-size:17px}.row{padding:12px}.two{gap:8px}}
 </style>
 </head>
@@ -186,6 +216,13 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
    </section>
   </main>
  </div>
+<nav class="bottom-nav" id="bnav">
+  <div class="nav-item active" data-t="home"><i class="fa fa-chart-pie"></i>Home</div>
+  <div class="nav-item" data-t="act"><i class="fa fa-list"></i>Activity</div>
+  <div class="nav-item" data-t="inv"><i class="fa fa-wallet"></i>Invest</div>
+  <div class="nav-item" data-t="loan"><i class="fa fa-building-columns"></i>Loans</div>
+ </nav>
+ <button class="fab" id="fab" aria-label="Add new"><i class="fa fa-plus"></i></button>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -276,7 +313,7 @@ const segVal = el => el.querySelector(".on").dataset.v;
 const open = id => $(id).classList.add("show"), close = () => $$(".sheet").forEach(s => s.classList.remove("show"));
 $$("[data-close]").forEach(b => b.onclick = close);
 $$(".sheet").forEach(s => s.onclick = e => { if (e.target === s) close(); });
-$$(".nav-item").forEach(b => b.onclick = () => { tab = b.dataset.t; $$(".nav-item").forEach(x => x.classList.toggle("active", x === b)); ["home","act","inv","loan"].forEach(t => $("#v-"+t).classList.toggle("hide", t !== tab)); sideClose(); render(); });
+$$(".nav-item").forEach(b => b.onclick = () => { tab = b.dataset.t; $$(".nav-item").forEach(x => x.classList.toggle("active", x.dataset.t === tab)); ["home","act","inv","loan"].forEach(t => $("#v-"+t).classList.toggle("hide", t !== tab)); sideClose(); render(); });
 const sideClose = () => { $("#sidebar").classList.remove("open"); $("#overlay").classList.remove("open"); };
 $("#burger").onclick = () => { $("#sidebar").classList.toggle("open"); $("#overlay").classList.toggle("open"); };
 $("#overlay").onclick = sideClose;
@@ -296,6 +333,7 @@ const clr = ids => ids.forEach(i => $(i).value = "");
 const newTx = () => { clr(["#t-amt","#t-note"]); fillCats(); $("#t-date").value = today(); open("#s-tx"); };
 const newInv = () => { clr(["#i-name","#i-amt","#i-rate","#i-dur","#i-mat"]); $("#i-start").value = today(); open("#s-inv"); };
 const newLoan = () => { clr(["#l-name","#l-lender","#l-amt","#l-rate","#l-months","#l-emi"]); $("#l-type").selectedIndex = 0; $("#l-first").value = today(); preset = false; open("#s-loan"); };
+$("#fab").onclick = () => ({home:newTx,act:newTx,inv:newInv,loan:newLoan})[tab]();
 $$("[data-add]").forEach(b => b.onclick = () => ({tx:newTx,inv:newInv,loan:newLoan})[b.dataset.add]());
 seg($("#tx-type"), v => { $("#t-mwrap").classList.toggle("hide", v === "income"); fillCats(); });
 fillCats();
@@ -334,7 +372,7 @@ const niceStep = x => { const p = Math.pow(10, Math.floor(Math.log10(x))), f = x
 const smooth = pts => pts.reduce((d,[x1,y1],i) => i ? d+` C${(pts[i-1][0]+x1)/2},${pts[i-1][1]} ${(pts[i-1][0]+x1)/2},${y1} ${x1},${y1}` : `M${x1},${y1}`, "");
 // Smooth gradient area chart with hover tooltip
 function areaChart(el, labels, series){
-  const W = el.clientWidth || 640, H = 250, m = {l:44,r:14,t:12,b:26}, iw = W-m.l-m.r, ih = H-m.t-m.b, n = labels.length;
+  const W = el.clientWidth || 640, H = document.documentElement.dataset.device === "mobile" ? 210 : 250, m = {l:44,r:14,t:12,b:26}, iw = W-m.l-m.r, ih = H-m.t-m.b, n = labels.length;
   const mx = Math.max(100, ...series.flatMap(x => x.data)), step = niceStep(mx/4), top = Math.ceil(mx/step)*step;
   const X = i => m.l + (n>1 ? i/(n-1)*iw : iw/2), Y = v => m.t + ih - v/top*ih;
   let g = "";
@@ -355,7 +393,7 @@ function areaChart(el, labels, series){
   svg.addEventListener("pointermove", move); svg.addEventListener("pointerdown", move); svg.addEventListener("pointerleave", out);
 }
 // Rounded ring chart; hover a segment to see its value in the centre
-function ringChart(el, items, label, valueTxt, size=190){
+function ringChart(el, items, label, valueTxt, size = document.documentElement.dataset.device === "mobile" ? 170 : 190){
   const r = size/2-14, C = 2*Math.PI*r, tot = items.reduce((a,x) => a+x.value,0), live = items.filter(x => x.value>0).length, gap = live>1 ? 20 : 0, c = size/2;
   let off = 0, segs = `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="#1e1e28" stroke-width="16"/>`;
   items.forEach((x,i) => { if (!x.value) return; const share = x.value/tot*C, len = Math.max(.5, share-gap); segs += `<circle class="rs" data-i="${i}" cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${x.color}" stroke-width="16" stroke-linecap="round" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 ${c} ${c})"/>`; off += share; });
@@ -370,10 +408,14 @@ function drawCharts(by){
   areaChart($("#c-bar"), ms.map(m => new Date(m+"-01T00:00").toLocaleDateString("en-IN",{month:"short"})), [{name:"Income",color:"#34d97b",data:ms.map(m => tot(m,"income"))},{name:"Expenses",color:"#f05c6e",data:ms.map(m => tot(m,"expense"))}]);
   ringChart($("#c-pie"), Object.keys(by).map(k => ({name:k,color:COL[k],value:by[k]})), "Spent", inr(Object.values(by).reduce((a,v) => a+v,0)));
   const mix = Object.keys(MIX).map(k => ({name:k,color:MIX[k],value:invs.filter(i => i.type===k).reduce((a,i) => a+i.invested,0)})), mt = mix.reduce((a,x) => a+x.value,0);
-  ringChart($("#c-mix"), mix, "Invested", inr(mt), 170);
+  ringChart($("#c-mix"), mix, "Invested", inr(mt), root.dataset.device === "mobile" ? 150 : 170);
   $("#mixleg").innerHTML = !mt ? `<div class="empty" style="padding:12px 0;text-align:left">No investments yet</div>` : mix.filter(x => x.value).map(x => `<div class="leg"><span><i class="legend-dot" style="background:${x.color}"></i>${x.name}</span><b>${inr(x.value)}${mt?` · ${Math.round(x.value/mt*100)}%`:""}</b></div>`).join("");
 }
-let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(render, 150); });
+// Detect device class from screen size, touch and installed-app mode (more reliable than browser name)
+const root = document.documentElement, mqM = matchMedia("(max-width:768px)"), mqT = matchMedia("(max-width:1100px)");
+const setDevice = () => { const d = mqM.matches ? "mobile" : mqT.matches ? "tablet" : "desktop", changed = root.dataset.device !== d; root.dataset.device = d; root.dataset.touch = matchMedia("(pointer:coarse)").matches ? "1" : "0"; root.dataset.pwa = (matchMedia("(display-mode: standalone)").matches || navigator.standalone) ? "1" : "0"; return changed; };
+setDevice();
+let rz; ["resize","orientationchange"].forEach(ev => addEventListener(ev, () => { clearTimeout(rz); rz = setTimeout(() => { setDevice(); render(); }, 150); }));
 function render(){
   renderLoans();
   const mt = txs.filter(t => t.date.startsWith(curYM)), ex = mt.filter(t => t.type==="expense"), ic = mt.filter(t => t.type==="income");
