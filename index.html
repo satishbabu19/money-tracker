@@ -12,6 +12,9 @@
 <title>Money Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<!-- SheetJS for CSV/XLS/XLSX & PDF.js for PDF bank/card statements -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{color-scheme:dark;--bg:#0f0f13;--card:#16161d;--surface:#16161d;--card2:#1e1e28;--line:rgba(255,255,255,.07);--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);--tx:#f0eff4;--mut:#7c7b8a;--green:#34d97b;--red:#f05c6e;--gold:#f5c842;--blue:#7c6af7;--accent:#7c6af7;--accent-bg:rgba(124,106,247,.12);--mono:'JetBrains Mono',monospace}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -37,7 +40,7 @@ body{font:14px/1.45 'Sora',-apple-system,sans-serif;background:var(--bg);color:v
 .nav-item.active{color:var(--tx);background:var(--accent-bg);border-left-color:var(--accent)}
 .nav-item i{width:16px;text-align:center;font-size:14px}
 .nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);padding:20px 24px 8px;opacity:.6}
-.sidebar-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:8px}
+.sidebar-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
 .export-btn{flex:1;padding:9px;background:var(--accent-bg);border:1px solid rgba(124,106,247,.3);border-radius:8px;color:var(--accent);font:12px 'Sora',sans-serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .export-btn:hover{background:rgba(124,106,247,.2)}
 .import-btn{background:var(--card2);border-color:var(--border2);color:var(--tx)}
@@ -89,10 +92,20 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .btn{width:100%;margin-top:16px;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:12px;font:500 14px 'Sora',sans-serif;cursor:pointer;transition:opacity .15s}
 .btn:hover{opacity:.85}.btn.ghost{background:none;color:var(--mut);margin-top:6px}.btn.add{width:auto;margin:0;padding:9px 16px;font-size:13px}
+.btn.sec{background:var(--card2);border:1px solid var(--border2);color:var(--tx)}
 .link{background:none;border:0;color:var(--accent);font:12px 'Sora',sans-serif;cursor:pointer;padding:4px;text-transform:none;letter-spacing:0}
 .sheet{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center;z-index:900}.sheet.show{display:flex}
 .panel{background:var(--card);border:1px solid var(--border2);width:100%;max-width:480px;border-radius:16px 16px 0 0;padding:20px 20px calc(env(safe-area-inset-bottom) + 20px);max-height:92vh;overflow:auto}
+.panel.wide{max-width:680px}
 .panel h3{margin-bottom:12px;text-align:center;font-size:16px;font-weight:600}
+.dropzone{border:1.5px dashed var(--border2);border-radius:10px;padding:20px;text-align:center;background:var(--card2);cursor:pointer;transition:border-color .2s;margin-top:8px}
+.dropzone:hover,.dropzone.drag{border-color:var(--accent);background:var(--accent-bg)}
+.imp-list{max-height:290px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.imp-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--card2);border-radius:8px;font-size:12px}
+.imp-row.dup{opacity:.45}
+.imp-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);flex:none}
+.imp-row select{padding:4px 6px;font-size:11px;width:115px;flex:none}
+.imp-meta{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px;color:var(--mut)}
 .loan{margin-bottom:14px}.sch{max-height:380px;overflow:auto}.sch .row{background:var(--card)}.row.paid{opacity:.55}
 .chk{width:24px;height:24px;border-radius:50%;border:2px solid #4a4a58;display:grid;place-items:center;font-size:13px;font-weight:700;color:transparent;flex:none}
 .chk.on{background:var(--green);border-color:var(--green);color:#000}
@@ -175,7 +188,11 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
     <div class="nav-item" data-t="inv"><i class="fa fa-wallet"></i> Investments</div>
     <div class="nav-item" data-t="loan"><i class="fa fa-building-columns"></i> Loans</div>
    </nav>
-   <div class="sidebar-footer"><button class="export-btn" id="export"><i class="fa fa-download"></i> Export</button><button class="export-btn import-btn" id="out"><i class="fa fa-right-from-bracket"></i> Sign out</button></div>
+   <div class="sidebar-footer">
+     <button class="export-btn" id="open-imp-side"><i class="fa fa-file-import"></i> Import</button>
+     <button class="export-btn import-btn" id="export"><i class="fa fa-download"></i> Export</button>
+     <button class="export-btn import-btn" id="out" style="flex-basis:100%"><i class="fa fa-right-from-bracket"></i> Sign out</button>
+   </div>
   </aside>
   <main class="main">
    <section id="v-home" class="page">
@@ -189,7 +206,7 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
      <div class="stat-card" style="--c:#4ecdc4"><div class="stat-label">Savings rate</div><div class="stat-value sav" id="sav">0%</div><div class="stat-change">of income saved</div></div>
     </div>
     <div class="chart-grid">
-     <div class="card"><div class="chart-title">Income &amp; expenses — last 6 months</div><div class="chart-wrap" id="c-bar"></div></div>
+     <div class="card"><div class="chart-title">Income & expenses — last 6 months</div><div class="chart-wrap" id="c-bar"></div></div>
      <div class="card"><div class="chart-title">Spent by method</div><div id="c-pie"></div><div id="mleg" style="margin-top:14px"></div></div>
     </div>
     <div class="chart-grid eq">
@@ -202,7 +219,13 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
     </div>
    </section>
    <section id="v-act" class="page hide">
-    <div class="page-header"><div><div class="page-title">Transactions</div><div class="page-subtitle">Income and expenses by Cash, UPI and Credit card</div></div><button class="btn add" data-add="tx"><i class="fa fa-plus"></i> Add</button></div>
+    <div class="page-header">
+      <div><div class="page-title">Transactions</div><div class="page-subtitle">Income and expenses by Cash, UPI and Credit card</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn add sec" id="open-imp"><i class="fa fa-file-arrow-up"></i> Import Statement</button>
+        <button class="btn add" data-add="tx"><i class="fa fa-plus"></i> Add</button>
+      </div>
+    </div>
     <div class="seg" id="mfilter"></div><div class="list" id="txl"></div>
    </section>
    <section id="v-inv" class="page hide">
@@ -237,6 +260,48 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
   <button class="btn" id="t-save">Save transaction</button><button class="btn ghost" data-close>Cancel</button>
 </div></div>
 
+<!-- Statement Import Sheet -->
+<div class="sheet" id="s-imp"><div class="panel wide">
+  <h3>Import Month-Wise Statement</h3>
+  <div class="seg" id="imp-src">
+    <button data-v="bank" class="on"><i class="fa fa-building-columns"></i> Savings Bank</button>
+    <button data-v="cc"><i class="fa fa-credit-card"></i> Credit Card Bill</button>
+  </div>
+  <div class="two">
+    <div>
+      <label>Statement Month (MM-YY)</label>
+      <input id="imp-month" placeholder="MM-YY (e.g. 11-26)" maxlength="5">
+    </div>
+    <div>
+      <label>Filter by Selected Month</label>
+      <select id="imp-filter-mode">
+        <option value="strict">Only selected MM-YY</option>
+        <option value="all">Import all rows in file</option>
+      </select>
+    </div>
+  </div>
+  <div id="imp-pdf-pw-wrap" class="hide">
+    <label>PDF Password (if statement is locked)</label>
+    <input id="imp-pdf-pw" type="password" placeholder="e.g. First 4 letters of name + DDMM">
+  </div>
+  <div class="dropzone" id="imp-drop">
+    <i class="fa fa-cloud-arrow-up" style="font-size:22px;color:var(--accent);margin-bottom:6px"></i>
+    <div style="font-weight:500">Tap or drop statement file here</div>
+    <div class="mut" style="margin-top:3px">Supports CSV, Excel (.xlsx / .xls), and PDF statements</div>
+    <input type="file" id="imp-file" accept=".csv,.xlsx,.xls,.pdf" class="hide">
+  </div>
+  <div id="imp-status" class="mut" style="margin-top:8px;text-align:center"></div>
+  <div id="imp-preview-wrap" class="hide">
+    <div class="imp-meta">
+      <span id="imp-summary">0 transactions ready</span>
+      <button class="link" id="imp-tog-all" type="button">Toggle all</button>
+    </div>
+    <div class="imp-list" id="imp-list"></div>
+    <button class="btn" id="imp-save">Import Selected Transactions</button>
+  </div>
+  <button class="btn ghost" data-close>Cancel</button>
+</div></div>
+
 <div class="sheet" id="s-inv"><div class="panel">
   <h3>New investment</h3>
   <label>Investment type</label><select id="i-type"></select>
@@ -262,7 +327,11 @@ input:focus,select:focus{border-color:var(--accent)}input[type=date]{-webkit-app
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import {getFirestore,collection,addDoc,deleteDoc,doc,onSnapshot,query,orderBy,updateDoc} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import {getFirestore,collection,addDoc,deleteDoc,doc,onSnapshot,query,orderBy,updateDoc,writeBatch} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
 
 // Firebase web config
 const firebaseConfig = {
@@ -320,7 +389,7 @@ $("#overlay").onclick = sideClose;
 const shiftYM = (ym,n) => { const [y,m] = ym.split("-").map(Number), i = y*12+m-1+n; return Math.floor(i/12)+"-"+String(i%12+1).padStart(2,"0"); };
 $("#pm").onclick = () => { curYM = shiftYM(curYM,-1); render(); };
 $("#nm").onclick = () => { curYM = shiftYM(curYM,1); render(); };
-const toast = (m,t="success") => { const e = $("#toast"); e.textContent = m; e.className = "toast show "+t; clearTimeout(tt); tt = setTimeout(() => e.classList.remove("show"), 2200); };
+const toast = (m,t="success") => { const e = $("#toast"); e.textContent = m; e.className = "toast show "+t; clearTimeout(tt); tt = setTimeout(() => e.classList.remove("show"), 2600); };
 $("#export").onclick = () => {
   const q = v => '"'+String(v ?? "").replace(/"/g,'""')+'"';
   const rows = [["Date","Type","Category","Method","Amount","Note"], ...txs.map(t => [t.date,t.type,t.category,t.method||"",t.amount,t.note||""])];
@@ -340,11 +409,325 @@ fillCats();
 seg($("#t-method")); 
 $("#i-type").onchange = () => $("#i-amtl").textContent = $("#i-type").value === "RD" ? "Monthly deposit (₹)" : "Amount invested (₹)";
 
+// ---------- Statement Uploader & Auto-Parser ----------
+let parsedRows = [], lastImpFile = null;
+const ymToMMYY = ym => `${ym.slice(5,7)}-${ym.slice(2,4)}`;
+const dateToMMYY = iso => `${iso.slice(5,7)}-${iso.slice(2,4)}`;
+
+const CAT_RULES = [
+  {kw:["swiggy","zomato","nandhana","meghana","biryani","restaurant","cafe","coffee","dining","bakery","kfc","mcdonald","domino","pizza"],cat:"Dining"},
+  {kw:["zepto","instamart","dmart","star market","bigbasket","grocer","milk","vegetable","curd","supermarket","reliance fresh","more retail"],cat:"Groceries"},
+  {kw:["irctc","redbus","apsrtc","bmtc","rapido","uber","ola","metro","flight","indigo","air india","makemytrip","goibibo","train"],cat:"Travel"},
+  {kw:["petrol","shell","hpcl","bpcl","ioc","fuel","diesel","indian oil"],cat:"Fuel"},
+  {kw:["bescom","electricity","water","airtel","jio","broadband","act fibernet","wifi","recharge","dth","billdesk"],cat:"Utilities"},
+  {kw:["indane","hp gas","bharat gas","lpg","gas"],cat:"Gas Bill"},
+  {kw:["lic","insurance","policy","hdfc life","sbi life","star health","acko"],cat:"Insurance"},
+  {kw:["emi","loan","bajaj","kotak loan","nach","ecs"],cat:"EMI"},
+  {kw:["rent","coliving","nestaway","stanza","nobroker","landlord"],cat:"House Rent"},
+  {kw:["credit card","cc bill","bbps","card payment","autopay"],cat:"Credit Card Bill"},
+  {kw:["amazon","flipkart","myntra","ajio","meesho","zudio","max fashion","decathlon","shopping"],cat:"Shopping"},
+  {kw:["pharmacy","apollo","medplus","hospital","clinic","doctor","health","diagnostic"],cat:"Health"},
+  {kw:["bookmyshow","netflix","prime","hotstar","spotify","cinema","movie","pvr","inox"],cat:"Entertainment"},
+  {kw:["school","toy","kid","child","viyoni"],cat:"Children"},
+  {kw:["salary","payroll","neft cr","imps cr","stipend"],cat:"Salary"},
+  {kw:["dividend","interest","zerodha","groww","upstox","mutual fund","redemption"],cat:"Investment Return"}
+];
+
+function guessCat(desc, type){
+  const d = desc.toLowerCase();
+  for (const r of CAT_RULES) {
+    if (r.kw.some(k => d.includes(k))) {
+      if (type === "income" && !CATS.income.includes(r.cat)) return "Other Income";
+      if (type === "expense" && !CATS.expense.includes(r.cat)) return "Others";
+      return r.cat;
+    }
+  }
+  return type === "income" ? "Other Income" : "Others";
+}
+
+function normDate(raw){
+  if (!raw) return null;
+  if (typeof raw === "number" && raw > 25000 && raw < 70000) {
+    const dt = new Date(Math.round((raw - 25569) * 86400 * 1000));
+    return dt.toISOString().slice(0,10);
+  }
+  const s = String(raw).trim();
+  const iso = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2,"0")}-${iso[3].padStart(2,"0")}`;
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (dmy) {
+    const y = dmy[3].length === 2 ? "20"+dmy[3] : dmy[3];
+    return `${y}-${dmy[2].padStart(2,"0")}-${dmy[1].padStart(2,"0")}`;
+  }
+  const monMap = {jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
+  const dMonY = s.match(/^(\d{1,2})[\s\-]([A-Za-z]{3})[\s\-](\d{2,4})/);
+  if (dMonY && monMap[dMonY[2].toLowerCase()]) {
+    const y = dMonY[3].length === 2 ? "20"+dMonY[3] : dMonY[3];
+    return `${y}-${monMap[dMonY[2].toLowerCase()]}-${dMonY[1].padStart(2,"0")}`;
+  }
+  return null;
+}
+
+const makeHash = (date, amount, note) => `${date}|${Math.round(amount*100)}|${String(note||"").toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,24)}`;
+
+function existingHashes(){
+  const set = new Set();
+  txs.forEach(t => {
+    if (t.hash) set.add(t.hash);
+    set.add(makeHash(t.date, t.amount, t.note || t.category));
+  });
+  return set;
+}
+
+function parseSpreadsheetRows(rows, src){
+  if (!rows.length) return [];
+  // Find actual header row (skip bank metadata header lines)
+  let hIdx = rows.findIndex(r => r.some(c => /^(date|txn\s*date|transaction\s*date|value\s*date)$/i.test(String(c||"").trim())));
+  if (hIdx < 0) hIdx = 0;
+  const headers = rows[hIdx].map(h => String(h||"").trim().toLowerCase());
+  const findCol = patterns => headers.findIndex(h => patterns.some(p => p.test(h)));
+
+  const cDate = findCol([/txn.*date/,/transaction.*date/,/^date$/, /posting.*date/, /value.*date/]);
+  const cDesc = findCol([/narration/,/description/,/particular/,/merchant/,/detail/,/remark/]);
+  const cDeb = findCol([/withdrawal/,/debit/,/dr\b/,/paid\s*out/]);
+  const cCred = findCol([/deposit/,/credit/,/cr\b/,/paid\s*in/]);
+  const cAmt = findCol([/^amount/,/txn.*amount/,/transaction.*amount/]);
+  const cType = findCol([/cr\/dr/,/dr\/cr/,/^type$/, /indicator/]);
+
+  const out = [];
+  for (let i = hIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r.length) continue;
+    const date = normDate(cDate >= 0 ? r[cDate] : r[0]);
+    const desc = String((cDesc >= 0 ? r[cDesc] : r[1]) || "").replace(/\s+/g," ").trim();
+    if (!date || !desc || /^(opening|closing)\s*balance/i.test(desc)) continue;
+
+    const num = v => parseFloat(String(v||"").replace(/[₹,\s]/g,"")) || 0;
+    let amount = 0, type = "expense";
+
+    if (cDeb >= 0 || cCred >= 0) {
+      const deb = cDeb >= 0 ? num(r[cDeb]) : 0;
+      const cred = cCred >= 0 ? num(r[cCred]) : 0;
+      if (deb > 0) { amount = deb; type = "expense"; }
+      else if (cred > 0) { amount = cred; type = src === "cc" ? "income" : "income"; }
+    } else if (cAmt >= 0) {
+      const rawA = String(r[cAmt]||"").trim();
+      amount = Math.abs(num(rawA));
+      const ind = String(cType >= 0 ? r[cType] : rawA).toUpperCase();
+      if (src === "cc") {
+        type = /\bCR\b/.test(ind) ? "income" : "expense";
+      } else {
+        type = /\bCR\b/.test(ind) || num(rawA) > 0 && !/\bDR\b/.test(ind) && cType >= 0 ? "income" : "expense";
+      }
+    }
+    if (!amount || amount <= 0) continue;
+
+    out.push({
+      date,
+      type,
+      amount: Math.round(amount * 100) / 100,
+      note: desc.slice(0, 90),
+      category: guessCat(desc, type),
+      method: type === "expense" ? (src === "cc" ? "Credit card" : "UPI") : null
+    });
+  }
+  return out;
+}
+
+async function parsePdfFile(file, src, password){
+  const buf = await file.arrayBuffer();
+  const task = pdfjsLib.getDocument({data: buf, password: password || undefined});
+  const pdf = await task.promise;
+  let allLines = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    // Group text items by Y coordinate into lines
+    const byY = {};
+    tc.items.forEach(it => {
+      const y = Math.round(it.transform[5] / 4) * 4;
+      (byY[y] = byY[y] || []).push({x: it.transform[4], str: it.str});
+    });
+    Object.keys(byY).sort((a,b) => b - a).forEach(y => {
+      const line = byY[y].sort((a,b) => a.x - b.x).map(i => i.str).join(" ").replace(/\s+/g," ").trim();
+      if (line) allLines.push(line);
+    });
+  }
+
+  const out = [];
+  const dateStartRe = /^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{1,2}[\s\-][A-Za-z]{3}[\s\-]\d{2,4})\s+(.+)/;
+  const amtTrailRe = /([\d,]+\.\d{2})\s*(CR|DR|Cr|Dr)?(?:\s+[\d,]+\.\d{2})?$/;
+
+  for (const line of allLines) {
+    const dm = line.match(dateStartRe);
+    if (!dm) continue;
+    const date = normDate(dm[1]);
+    if (!date) continue;
+    const am = dm[2].match(amtTrailRe);
+    if (!am) continue;
+    const amount = parseFloat(am[1].replace(/,/g,""));
+    if (!amount || amount <= 0) continue;
+
+    const desc = dm[2].replace(amtTrailRe, "").trim() || "Statement entry";
+    if (/opening balance|closing balance|total amount due|minimum amount due/i.test(desc)) continue;
+
+    const flag = (am[2] || "").toUpperCase();
+    let type = "expense";
+    if (src === "cc") {
+      type = flag === "CR" ? "income" : "expense";
+    } else {
+      type = flag === "CR" || /\b(cr|salary|neft cr|imps cr|interest)\b/i.test(desc) ? "income" : "expense";
+    }
+
+    out.push({
+      date,
+      type,
+      amount,
+      note: desc.slice(0, 90),
+      category: guessCat(desc, type),
+      method: type === "expense" ? (src === "cc" ? "Credit card" : "UPI") : null
+    });
+  }
+  return out;
+}
+
+function renderImpPreview(){
+  const targetMMYY = $("#imp-month").value.trim();
+  const strict = $("#imp-filter-mode").value === "strict";
+  const hashes = existingHashes();
+
+  const filtered = parsedRows.filter(r => !strict || !targetMMYY || dateToMMYY(r.date) === targetMMYY);
+  filtered.forEach(r => {
+    r.hash = makeHash(r.date, r.amount, r.note);
+    r.isDup = hashes.has(r.hash);
+    if (r.checked === undefined) r.checked = !r.isDup;
+  });
+
+  window._impVisible = filtered;
+  const selCount = filtered.filter(r => r.checked).length;
+  const dupCount = filtered.filter(r => r.isDup).length;
+  $("#imp-preview-wrap").classList.remove("hide");
+  $("#imp-summary").textContent = `${selCount} selected · ${filtered.length} matched${dupCount ? ` (${dupCount} duplicates skipped)` : ""}`;
+
+  $("#imp-list").innerHTML = filtered.length ? filtered.map((r, idx) => {
+    const catOpts = CATS[r.type].map(c => `<option ${c===r.category?"selected":""}>${c}</option>`).join("");
+    return `<div class="imp-row ${r.isDup?"dup":""}">
+      <input type="checkbox" ${r.checked?"checked":""} onchange="window._impVisible[${idx}].checked=this.checked;window._updImpCount()">
+      <div class="grow">
+        <b>${esc(r.note)}</b>
+        <span class="mut">${r.date} · ${r.method||"Income"}${r.isDup?" · Already exists":""}</span>
+      </div>
+      <select onchange="window._impVisible[${idx}].category=this.value">${catOpts}</select>
+      <div class="amt ${r.type==="income"?"pos":"neg"}">${r.type==="income"?"+":"−"}${inr(r.amount)}</div>
+    </div>`;
+  }).join("") : `<div class="empty" style="padding:20px 0">No transactions found for ${esc(targetMMYY || "this file")}. Try switching filter to "Import all rows".</div>`;
+}
+window._updImpCount = () => {
+  const v = window._impVisible || [];
+  $("#imp-summary").textContent = `${v.filter(r => r.checked).length} selected · ${v.length} matched`;
+};
+
+async function processStatementFile(file){
+  if (!file) return;
+  lastImpFile = file;
+  const src = segVal($("#imp-src"));
+  const ext = file.name.split(".").pop().toLowerCase();
+  $("#imp-pdf-pw-wrap").classList.toggle("hide", ext !== "pdf");
+  $("#imp-status").textContent = `Reading ${file.name}...`;
+  try {
+    if (ext === "pdf") {
+      parsedRows = await parsePdfFile(file, src, $("#imp-pdf-pw").value);
+    } else {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, {type:"array"});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+      parsedRows = parseSpreadsheetRows(rows, src);
+    }
+    $("#imp-status").textContent = `Parsed ${parsedRows.length} rows from ${file.name}`;
+    renderImpPreview();
+  } catch (err) {
+    if (err && err.name === "PasswordException") {
+      $("#imp-pdf-pw-wrap").classList.remove("hide");
+      $("#imp-status").textContent = "PDF is password-protected. Enter password above and click file again.";
+      toast("PDF password required", "error");
+    } else {
+      console.error(err);
+      $("#imp-status").textContent = "Could not parse file. Ensure it is a valid bank/card CSV, Excel, or PDF statement.";
+      toast("Failed to parse statement", "error");
+    }
+  }
+}
+
+const openImportModal = () => {
+  parsedRows = []; lastImpFile = null;
+  $("#imp-file").value = "";
+  $("#imp-pdf-pw").value = "";
+  $("#imp-pdf-pw-wrap").classList.add("hide");
+  $("#imp-preview-wrap").classList.add("hide");
+  $("#imp-status").textContent = "";
+  $("#imp-month").value = ymToMMYY(curYM);
+  sideClose();
+  open("#s-imp");
+};
+$("#open-imp").onclick = openImportModal;
+$("#open-imp-side").onclick = openImportModal;
+seg($("#imp-src"), () => { if (lastImpFile) processStatementFile(lastImpFile); });
+$("#imp-month").addEventListener("input", () => { if (parsedRows.length) renderImpPreview(); });
+$("#imp-filter-mode").addEventListener("change", () => { if (parsedRows.length) renderImpPreview(); });
+$("#imp-pdf-pw").addEventListener("change", () => { if (lastImpFile) processStatementFile(lastImpFile); });
+$("#imp-drop").onclick = () => $("#imp-file").click();
+$("#imp-file").onchange = e => processStatementFile(e.target.files[0]);
+$("#imp-drop").ondragover = e => { e.preventDefault(); $("#imp-drop").classList.add("drag"); };
+$("#imp-drop").ondragleave = () => $("#imp-drop").classList.remove("drag");
+$("#imp-drop").ondrop = e => { e.preventDefault(); $("#imp-drop").classList.remove("drag"); processStatementFile(e.dataTransfer.files[0]); };
+$("#imp-tog-all").onclick = () => {
+  const v = window._impVisible || [];
+  const nextState = !v.every(r => r.checked);
+  v.forEach(r => r.checked = nextState);
+  renderImpPreview();
+};
+$("#imp-save").onclick = async () => {
+  const toSave = (window._impVisible || []).filter(r => r.checked);
+  if (!toSave.length) return toast("Select at least one transaction", "error");
+  const btn = $("#imp-save");
+  btn.disabled = true; btn.textContent = "Importing...";
+  try {
+    // Firestore writeBatch supports up to 500 writes per batch
+    for (let i = 0; i < toSave.length; i += 450) {
+      const batch = writeBatch(db);
+      toSave.slice(i, i + 450).forEach(r => {
+        const ref = doc(collection(db, "users", uid, "transactions"));
+        batch.set(ref, {
+          type: r.type,
+          amount: r.amount,
+          category: r.category,
+          date: r.date,
+          note: r.note,
+          method: r.method,
+          hash: r.hash,
+          statementMonth: $("#imp-month").value.trim() || dateToMMYY(r.date)
+        });
+      });
+      await batch.commit();
+    }
+    close();
+    toast(`Imported ${toSave.length} transactions`);
+  } catch (e) {
+    console.error(e);
+    toast("Error saving transactions", "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "Import Selected Transactions";
+  }
+};
+
 // ---------- save ----------
 $("#t-save").onclick = async () => {
   const amount = +$("#t-amt").value; if (!amount) return;
   const type = segVal($("#tx-type"));
-  await addDoc(collection(db,"users",uid,"transactions"), {type, amount, category:$("#t-cat").value.trim()||"General", date:$("#t-date").value||today(), note:$("#t-note").value.trim(), method: type==="expense" ? segVal($("#t-method")) : null});
+  const date = $("#t-date").value||today();
+  const note = $("#t-note").value.trim();
+  await addDoc(collection(db,"users",uid,"transactions"), {type, amount, category:$("#t-cat").value.trim()||"General", date, note, method: type==="expense" ? segVal($("#t-method")) : null, hash: makeHash(date, amount, note)});
   close(); toast("Saved");
 };
 function addMonths(d, m){ const x = new Date(d); x.setMonth(x.getMonth()+m); return x.toISOString().slice(0,10); }
@@ -439,7 +822,7 @@ function render(){
   $("#mfilter").innerHTML = filters.map(f => `<button class="${f===mf?"on":""}" data-v="${f}">${f==="Credit card"?"Card":f}</button>`).join("");
   seg($("#mfilter"), v => { mf = v; render(); });
   const shown = txs.filter(t => mf==="All" || (mf==="Income" ? t.type==="income" : t.method===mf));
-  $("#txl").innerHTML = shown.length ? shown.map(t => `<div class="row"><div class="ico ${t.type==="income"?"inc":"exp"}">${t.type==="income"?ICON.income:ICON[t.method]}</div><div class="grow"><b>${esc(t.category)}</b><span class="mut">${t.date}${t.method?" · "+t.method:""}${t.note?" · "+esc(t.note):""}</span></div><div class="amt ${t.type==="income"?"pos":"neg"}">${t.type==="income"?"+":"−"}${inr(t.amount)}</div><button class="del" onclick="delTx('${t.id}')">×</button></div>`).join("") : `<div class="empty">Nothing here yet. Use Add to record a transaction.</div>`;
+  $("#txl").innerHTML = shown.length ? shown.map(t => `<div class="row"><div class="ico ${t.type==="income"?"inc":"exp"}">${t.type==="income"?ICON.income:ICON[t.method]}</div><div class="grow"><b>${esc(t.category)}</b><span class="mut">${t.date}${t.method?" · "+t.method:""}${t.note?" · "+esc(t.note):""}</span></div><div class="amt ${t.type==="income"?"pos":"neg"}">${t.type==="income"?"+":"−"}${inr(t.amount)}</div><button class="del" onclick="delTx('${t.id}')">×</button></div>`).join("") : `<div class="empty">Nothing here yet. Use Add or Import Statement to record transactions.</div>`;
   $("#invl").innerHTML = invs.length ? invs.map(i => invRow(i,true)).join("") : `<div class="empty">No investments yet. Use Add to enter an FD, RD, stock or fund.</div>`;
 }
 // ---------- loans ----------
@@ -495,7 +878,7 @@ function invRow(i, withDel){
   const gain = i.maturityAmount - i.invested;
   return `<div class="row"><div class="ico inv">${ICON[i.type]}</div><div class="grow"><b>${esc(i.name)}</b><span class="mut">${INV_CAT[i.type]||i.type} · ${i.rate}% · matures ${i.maturityDate}</span></div><div class="amt">${inr(i.maturityAmount)}<div class="mut pos">+${inr(gain)}</div></div>${withDel?`<button class="del" onclick="delInv('${i.id}')">×</button>`:""}</div>`;
 }
-const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&","<":"<",">":">",'"':""","'":"'"}[c]));
 </script>
 <script>if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
 </body>
